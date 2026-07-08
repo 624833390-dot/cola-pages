@@ -249,9 +249,21 @@ body {
   <div class="settings-hint" id="syncHelp">数据保存在本地 + Firebase 实时同步。<br>两人打开页面后，抱抱记录自动同步。</div>
 </div>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<!-- Firebase SDK loaded dynamically for reliable ordering -->
+<script>
+// ========== Firebase SDK loader ==========
+(function loadFirebaseSDK() {
+  var appScript = document.createElement('script');
+  appScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+  appScript.onload = function() {
+    var dbScript = document.createElement('script');
+    dbScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
+    dbScript.onload = function() { window._fbReady = true; };
+    document.head.appendChild(dbScript);
+  };
+  document.head.appendChild(appScript);
+})();
+</script>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -293,13 +305,18 @@ function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); 
 
 // ========== Firebase init ==========
 async function initFirebase() {
-  if (!window.firebase || !window.firebase.database) {
-    setSyncState('offline', 'Firebase SDK 加载失败，检查网络');
+  // Wait for dynamic loader to finish
+  for (let i = 0; i < 30; i++) {
+    if (window._fbReady && window.firebase && typeof window.firebase.database === 'function') break;
+    await new Promise(r => setTimeout(r, 400));
+  }
+  if (!window.firebase || typeof window.firebase.database !== 'function') {
+    setSyncState('offline', 'Firebase SDK 加载失败');
     return false;
   }
   try {
-    const app = firebase.initializeApp(FB_CONFIG);
-    db = firebase.database(app);
+    firebase.initializeApp(FB_CONFIG);
+    db = firebase.database();
     fbReady = true;
 
     // Real-time sync: listen for all changes
