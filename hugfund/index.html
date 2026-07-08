@@ -8,20 +8,15 @@
 <title>抱抱许愿池</title>
 <style>
 :root {
-  --bg: #faf7f4;
-  --card: #fffbf8;
-  --text: #3d3226;
-  --sub: #9b8c7d;
-  --accent: #e8856d;
-  --gold: #c8963e;
-  --shadow: 0 2px 16px rgba(60,30,10,.06);
-  --radius: 20px;
+  --bg: #faf7f4; --card: #fffbf8; --text: #3d3226; --sub: #9b8c7d;
+  --accent: #e8856d; --gold: #c8963e;
+  --shadow: 0 2px 16px rgba(60,30,10,.06); --radius: 20px;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
   font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
   background:var(--bg); color:var(--text); min-height:100vh;
-  -webkit-font-smoothing:antialiased; padding-bottom:80px;
+  -webkit-font-smoothing:antialiased; padding-bottom:100px;
 }
 .toast-bar {
   position:fixed; top:0; left:0; right:0; background:#4caf50; color:#fff;
@@ -34,6 +29,7 @@ body {
 @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
 .header h1 { font-size:22px; font-weight:600; letter-spacing:.5px; margin:4px 0; }
 .header .subtitle { font-size:13px; color:var(--sub); }
+
 .balance-card {
   margin:0 20px 20px; background:var(--card); border-radius:var(--radius);
   box-shadow:var(--shadow); padding:24px; text-align:center; position:relative; overflow:hidden;
@@ -46,13 +42,24 @@ body {
 .balance-label { font-size:12px; color:var(--sub); letter-spacing:1px; margin-bottom:6px; }
 .balance-amount { font-size:42px; font-weight:700; color:var(--gold); letter-spacing:-1px; position:relative; z-index:1; }
 .balance-amount .unit { font-size:16px; font-weight:400; margin-left:2px; }
-.balance-stats { display:flex; justify-content:center; gap:32px; margin-top:12px; font-size:12px; color:var(--sub); }
+.balance-stats { display:flex; justify-content:center; gap:24px; margin-top:12px; font-size:12px; color:var(--sub); }
 .balance-stats span strong { color:var(--text); font-weight:600; }
+
+.share-btn-row { display:flex; justify-content:center; gap:12px; margin-top:14px; }
+.btn-share {
+  display:inline-flex; align-items:center; gap:5px; padding:7px 16px;
+  background:#fff; border:1px solid #e8dcd0; border-radius:20px;
+  font-size:12px; color:var(--sub); cursor:pointer;
+  -webkit-tap-highlight-color:transparent; transition:all .15s;
+}
+.btn-share:active { background:#fdf0eb; border-color:var(--accent); color:var(--accent); }
+
 .goal-bar-wrap { margin:0 20px 20px; background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 20px; display:none; }
 .goal-bar-label { font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; }
 .goal-bar-label .goal-name { color:var(--text); font-weight:500; }
 .goal-bar { height:6px; background:#f0e8e0; border-radius:3px; overflow:hidden; }
 .goal-bar-fill { height:100%; background:linear-gradient(90deg,#e8856d,#c8963e); border-radius:3px; transition:width .5s ease; }
+
 .hug-section { margin:0 20px 28px; text-align:center; }
 .btn-hug {
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
@@ -98,6 +105,23 @@ body {
   100% { opacity:0; transform:translate(-50%,-60%) scale(1); }
 }
 
+/* Share card overlay */
+.share-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center;
+  z-index:150; opacity:0; pointer-events:none; transition:opacity .25s;
+}
+.share-overlay.active { opacity:1; pointer-events:auto; }
+.share-card-wrap {
+  background:#fff; border-radius:20px; padding:16px; max-width:340px; width:calc(100% - 40px);
+  box-shadow:0 12px 48px rgba(0,0,0,.15); text-align:center;
+}
+.share-card-wrap canvas { width:100%; border-radius:14px; display:block; }
+.share-card-actions { display:flex; gap:10px; margin-top:12px; }
+.share-card-actions button { flex:1; padding:11px; border-radius:24px; font-size:14px; font-weight:600; border:none; cursor:pointer; }
+.btn-save { background:var(--accent); color:#fff; }
+.btn-close { background:#f0e8e0; color:var(--sub); }
+
 .timeline-section { margin:0 20px; }
 .timeline-title { font-size:14px; font-weight:600; color:var(--sub); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
 .timeline-list { list-style:none; }
@@ -122,6 +146,8 @@ body {
 .sync-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
 .sync-dot.online { background:#4caf50; }
 .sync-dot.offline { background:#ccc; }
+.sync-dot.cloud { background:#00a4ff; animation:pulse 2s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
 .settings-toggle { position:fixed; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:var(--card); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; z-index:50; border:none; color:var(--sub); -webkit-tap-highlight-color:transparent; }
 .settings-panel { position:fixed; bottom:0; left:0; width:100%; background:var(--card); border-radius:24px 24px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,.08); z-index:90; padding:24px 24px 36px; transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1); }
@@ -149,8 +175,11 @@ body {
   <div class="balance-label">💛 心愿基金</div>
   <div class="balance-amount" id="balanceDisplay">0<span class="unit">元</span></div>
   <div class="balance-stats">
-    <span>我：<strong id="myCount">0</strong>次</span>
-    <span>TA：<strong id="taCount">0</strong>次</span>
+    <span>老王：<strong id="myCount">0</strong>次</span>
+    <span>安妮：<strong id="taCount">0</strong>次</span>
+  </div>
+  <div class="share-btn-row">
+    <button class="btn-share" id="btnShareCard">📤 生成分享卡片</button>
   </div>
 </div>
 
@@ -167,10 +196,11 @@ body {
     <span class="emoji">🤗</span> 感觉 TA 不开心
   </button>
   <div class="hug-hint">按一下 · 基金+1000 · TA收到抱抱</div>
-  <div class="sync-indicator">
-    <span class="sync-dot offline" id="syncDot"></span>
-    <span id="syncLabel">本机模式（分享链接给TA同步查看）</span>
-  </div>
+</div>
+
+<div class="sync-indicator">
+  <span class="sync-dot offline" id="syncDot"></span>
+  <span id="syncLabel">等待同步…</span>
 </div>
 
 <div class="timeline-section">
@@ -179,6 +209,7 @@ body {
   <div class="empty-state" id="emptyState">还没有抱抱。按一下上面的按钮，送出第一个。</div>
 </div>
 
+<!-- Hug confirm modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="m-emoji">🤗</div>
@@ -187,6 +218,17 @@ body {
     <div class="m-actions">
       <button class="btn-cancel" id="btnCancel">再想想</button>
       <button class="btn-confirm" id="btnConfirm">抱抱 🤗</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share card overlay -->
+<div class="share-overlay" id="shareOverlay">
+  <div class="share-card-wrap">
+    <canvas id="shareCanvas" width="600" height="900"></canvas>
+    <div class="share-card-actions">
+      <button class="btn-close" id="btnCloseShare">关闭</button>
+      <button class="btn-save" id="btnSaveShare">保存图片</button>
     </div>
   </div>
 </div>
@@ -202,103 +244,131 @@ body {
   <div class="settings-row"><label>心愿目标</label><input type="text" id="inputGoal" placeholder="比如：去大理"></div>
   <div class="settings-row"><label>目标金额</label><input type="number" id="inputGoalAmount" value="10000"></div>
   <button class="btn-reset" id="btnReset">重置所有数据</button>
-  <div class="settings-hint">数据保存在你的手机/电脑本地。<br>想跟 TA 同步？截图分享余额页，或两人一起打开这个链接。</div>
+  <div class="settings-hint" id="syncHelp">数据保存在本地 + CloudBase 实时同步。<br>两人打开页面后，抱抱记录自动同步。</div>
 </div>
+
+<!-- CloudBase SDK -->
+<script src="//imgcache.qq.com/qcloud/cloudbase-js-sdk/1.8.0/cloudbase.full.js"></script>
 
 <script>
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'hugfund_v2';
 
-// Default data
+// ========== CloudBase config ==========
+const CB_ENV_ID = 'YOUR_ENV_ID'; // ← 替换为你的 CloudBase 环境 ID
+const PAGE_URL = 'https://624833390-dot.github.io/cola-pages/hugfund/';
+let cloudbase, db, cloudReady = false;
+
+// ========== Defaults ==========
 const defaults = {
   balance: 0, myHugs: 0, taHugs: 0,
   goal: '', goalAmount: 10000,
-  partnerName: '安妮', myName: '老王',
-  whoAmI: '老王',
+  partnerName: '安妮', myName: '老王', whoAmI: '老王',
   timeline: []
 };
 
-function load() {
+// ========== Data layer ==========
+let data = loadLocal();
+
+function loadLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...defaults, ...JSON.parse(raw) };
   } catch(e) {}
   return { ...defaults };
 }
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
-let data = load();
-
-// Try server connection
-const SERVER_URL = '';
-let serverOnline = false;
-
-async function tryServer() {
+// ========== CloudBase init ==========
+async function initCloudBase() {
+  if (CB_ENV_ID === 'YOUR_ENV_ID') {
+    setSyncState('offline', '本机模式 · 配置 CloudBase 后开启实时同步');
+    return false;
+  }
   try {
-    const res = await fetch(SERVER_URL + '/api/data', { signal: AbortSignal.timeout(3000) });
-    if (res.ok) {
-      serverOnline = true;
-      const srv = await res.json();
-      // Merge: server data wins for balance/timeline
-      data.balance = srv.balance || 0;
-      data.myHugs = srv.myHugs || 0;
-      data.taHugs = srv.taHugs || 0;
-      data.timeline = srv.timeline || [];
-      if (srv.goal) data.goal = srv.goal;
-      if (srv.goalAmount) data.goalAmount = srv.goalAmount;
-      if (srv.partnerName) data.partnerName = srv.partnerName;
-      if (srv.myName) data.myName = srv.myName;
-      save();
-      render();
-      connectSSE();
-      return true;
-    }
-  } catch(e) {}
-  return false;
-}
+    cloudbase = window.cloudbase.init({ env: CB_ENV_ID });
+    const auth = cloudbase.auth({ persistence: 'local' });
+    await auth.anonymousAuthProvider().signIn();
+    db = cloudbase.database();
+    cloudReady = true;
 
-function connectSSE() {
-  const es = new EventSource(SERVER_URL + '/api/sse');
-  es.onopen = () => { $('syncDot').className = 'sync-dot online'; $('syncLabel').textContent = '实时同步中'; };
-  es.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      data.balance = d.balance || 0;
-      data.myHugs = d.myHugs || 0;
-      data.taHugs = d.taHugs || 0;
-      data.timeline = d.timeline || [];
-      data.partnerName = d.partnerName || data.partnerName;
-      data.myName = d.myName || data.myName;
-      data.goal = d.goal || data.goal;
-      data.goalAmount = d.goalAmount || data.goalAmount;
-      save(); render();
-    } catch(ex) {}
-  };
-  es.addEventListener('hug', (e) => {
-    try {
-      const hug = JSON.parse(e.data);
-      if (hug.from !== data.whoAmI) {
-        showToast('🤗');
-        notifyMe(hug.message);
+    // Watch for real-time changes
+    db.collection('hugfund').doc('shared').watch({
+      onChange(snapshot) {
+        const docs = snapshot.docs;
+        if (docs && docs.length > 0) {
+          const srv = docs[0];
+          // Don't overwrite if the change came from us (avoid loops)
+          if (srv._from !== data.whoAmI || Date.now() - (srv._ts || 0) > 2000) {
+            mergeServerData(srv);
+          }
+        }
+      },
+      onError(e) {
+        console.warn('CloudBase watch error:', e);
       }
-    } catch(ex) {}
-  });
-  es.addEventListener('state', (e) => {
-    try {
-      const state = JSON.parse(e.data);
-      Object.assign(data, state);
-      save(); render();
-    } catch(ex) {}
-  });
-  es.onerror = () => {
-    $('syncDot').className = 'sync-dot offline';
-    $('syncLabel').textContent = '服务器连接断开 · 数据保存在本地';
-  };
+    });
+
+    // Pull initial state
+    await pullFromCloud();
+    setSyncState('cloud', 'CloudBase 实时同步中');
+    return true;
+  } catch(e) {
+    console.warn('CloudBase init failed:', e);
+    setSyncState('offline', 'CloudBase 连接失败 · 使用本机模式');
+    return false;
+  }
 }
 
+async function pullFromCloud() {
+  if (!cloudReady) return;
+  try {
+    const res = await db.collection('hugfund').doc('shared').get();
+    if (res.data && res.data.length > 0) {
+      mergeServerData(res.data[0]);
+    }
+  } catch(e) {
+    // Document doesn't exist yet — that's fine
+  }
+}
+
+function mergeServerData(srv) {
+  let changed = false;
+  if (srv.balance !== undefined && srv.balance > (data.balance || 0)) { data.balance = srv.balance; changed = true; }
+  if (srv.myHugs !== undefined) { data.myHugs = srv.myHugs; changed = true; }
+  if (srv.taHugs !== undefined) { data.taHugs = srv.taHugs; changed = true; }
+  if (srv.timeline) { data.timeline = srv.timeline; changed = true; }
+  if (srv.goal) { data.goal = srv.goal; changed = true; }
+  if (srv.goalAmount) { data.goalAmount = srv.goalAmount; changed = true; }
+  if (srv.partnerName) { data.partnerName = srv.partnerName; changed = true; }
+  if (srv.myName) { data.myName = srv.myName; changed = true; }
+  if (changed) { saveLocal(); render(); }
+}
+
+async function pushToCloud() {
+  if (!cloudReady) return;
+  try {
+    await db.collection('hugfund').doc('shared').set({
+      balance: data.balance,
+      myHugs: data.myHugs,
+      taHugs: data.taHugs,
+      timeline: data.timeline,
+      goal: data.goal,
+      goalAmount: data.goalAmount,
+      partnerName: data.partnerName,
+      myName: data.myName,
+      _from: data.whoAmI,
+      _ts: Date.now()
+    });
+  } catch(e) {
+    console.warn('CloudBase push failed:', e);
+  }
+}
+
+// ========== Render ==========
 function render() {
   const d = data;
-  $('partnerLabel').textContent = '给 ' + (d.partnerName || 'Annie');
+  $('partnerLabel').textContent = '给 ' + (d.partnerName || '安妮');
   $('balanceDisplay').innerHTML = (d.balance||0).toLocaleString() + '<span class="unit">元</span>';
   $('myCount').textContent = d.myHugs || 0;
   $('taCount').textContent = d.taHugs || 0;
@@ -329,46 +399,41 @@ function render() {
           <div class="tl-message">${esc(item.message||'')}</div>
           <div class="tl-amount">+¥1,000 · 余额 ¥${(item.balanceAfter||0).toLocaleString()}</div>
         </div>
-        <div class="tl-time">${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</div>`;
+        <div class="tl-time">${pad(t.getMonth()+1)}/${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}</div>`;
       $('timelineList').appendChild(li);
     });
   }
 
-  $('modalTaName').textContent = d.partnerName || 'Annie';
-  $('inputPartnerName').value = d.partnerName || 'Annie';
-  $('inputMyName').value = d.myName || 'Alex';
+  $('modalTaName').textContent = d.partnerName || '安妮';
+  $('inputPartnerName').value = d.partnerName || '安妮';
+  $('inputMyName').value = d.myName || '老王';
   $('inputGoal').value = d.goal || '';
   $('inputGoalAmount').value = d.goalAmount || 10000;
-  $('inputWhoAmI').value = d.whoAmI || 'Alex';
+  $('inputWhoAmI').value = d.whoAmI || '老王';
 }
 
+function pad(n) { return String(n).padStart(2,'0'); }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setSyncState(cls, label) {
+  $('syncDot').className = 'sync-dot ' + cls;
+  $('syncLabel').textContent = label;
+}
 
+// ========== Hug ==========
 function doHug() {
   const now = new Date().toISOString();
   const msg = data.whoAmI + ' 感觉 ' + data.partnerName + ' 不太开心，给了一个抱抱';
   data.balance += 1000;
-  if (data.whoAmI === 'Alex') data.myHugs++; else data.taHugs++;
+  if (data.whoAmI === '老王') data.myHugs++; else data.taHugs++;
   const entry = {
     id: Math.random().toString(36).slice(2,10),
-    time: now,
-    message: msg,
-    from: data.whoAmI,
-    emoji: '🤗',
-    amount: 1000,
-    balanceAfter: data.balance
+    time: now, message: msg, from: data.whoAmI, emoji: '🤗',
+    amount: 1000, balanceAfter: data.balance
   };
   data.timeline.push(entry);
-  save(); render();
-
-  // Try server sync
-  if (serverOnline) {
-    fetch(SERVER_URL + '/api/hug', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ from: data.whoAmI })
-    }).catch(()=>{});
-  }
+  saveLocal();
+  pushToCloud();
+  render();
 }
 
 let toastTimer;
@@ -382,14 +447,200 @@ function showToast(emoji) {
 }
 function notifyMe(msg) {
   if (Notification.permission === 'granted') {
-    new Notification('🤗 抱抱基金', { body: msg });
+    new Notification('🤗 抱抱许愿池', { body: msg });
   }
   $('toastBar').textContent = msg;
   $('toastBar').classList.add('show');
   setTimeout(() => $('toastBar').classList.remove('show'), 4000);
 }
 
-// Events
+// ========== Share card (方案 D) ==========
+let qrImage = null;
+
+function loadQRCode() {
+  // Generate QR via API, cache as Image
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(PAGE_URL);
+  qrImage = new Image();
+  qrImage.crossOrigin = 'anonymous';
+  qrImage.src = qrUrl;
+}
+
+function drawShareCard() {
+  const canvas = $('shareCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 600, H = 900;
+
+  // Background — warm gradient
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#fffbf8');
+  bg.addColorStop(0.5, '#fdf5f0');
+  bg.addColorStop(1, '#faf7f4');
+  ctx.fillStyle = bg;
+  roundRect(ctx, 0, 0, W, H, 24);
+  ctx.fill();
+
+  // Decorative circles
+  ctx.fillStyle = 'rgba(232,133,109,0.06)';
+  ctx.beginPath(); ctx.arc(480, 100, 160, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(200,150,62,0.05)';
+  ctx.beginPath(); ctx.arc(120, 750, 180, 0, Math.PI*2); ctx.fill();
+
+  // Title
+  ctx.fillStyle = '#3d3226';
+  ctx.font = 'bold 36px -apple-system,"PingFang SC",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🤗 抱抱许愿池', W/2, 80);
+
+  // Subtitle
+  ctx.fillStyle = '#9b8c7d';
+  ctx.font = '18px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('老王 & 安妮', W/2, 115);
+
+  // Divider
+  ctx.strokeStyle = '#e8dcd0';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(60, 140); ctx.lineTo(W-60, 140); ctx.stroke();
+
+  // Balance
+  ctx.fillStyle = '#c8963e';
+  ctx.font = 'bold 56px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('¥ ' + (data.balance||0).toLocaleString(), W/2, 210);
+
+  ctx.fillStyle = '#9b8c7d';
+  ctx.font = '15px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('心愿基金', W/2, 238);
+
+  // Hug counts
+  const countY = 280;
+  // Left — 老王
+  ctx.fillStyle = '#fdf0eb';
+  roundRect(ctx, 80, countY, 200, 80, 16);
+  ctx.fill();
+  ctx.fillStyle = '#e8856d';
+  ctx.font = 'bold 32px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText((data.myHugs||0) + ' 次', 180, countY + 48);
+  ctx.fillStyle = '#9b8c7d';
+  ctx.font = '14px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('老王送出', 180, countY + 70);
+
+  // Right — 安妮
+  ctx.fillStyle = '#fdf0eb';
+  roundRect(ctx, 320, countY, 200, 80, 16);
+  ctx.fill();
+  ctx.fillStyle = '#e8856d';
+  ctx.font = 'bold 32px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText((data.taHugs||0) + ' 次', 420, countY + 48);
+  ctx.fillStyle = '#9b8c7d';
+  ctx.font = '14px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('安妮送出', 420, countY + 70);
+
+  // Goal progress
+  if (data.goal) {
+    const goalY = 400;
+    ctx.fillStyle = '#3d3226';
+    ctx.font = 'bold 18px -apple-system,"PingFang SC",sans-serif';
+    ctx.fillText('🎯 ' + data.goal, W/2, goalY);
+
+    const pct = Math.min(100, Math.round((data.balance||0) / (data.goalAmount||10000) * 100));
+    const barX = 80, barW = 440, barH = 12, barY = goalY + 24;
+    ctx.fillStyle = '#f0e8e0';
+    roundRect(ctx, barX, barY, barW, barH, 6);
+    ctx.fill();
+    const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    grad.addColorStop(0, '#e8856d');
+    grad.addColorStop(1, '#c8963e');
+    ctx.fillStyle = grad;
+    roundRect(ctx, barX, barY, barW * pct / 100, barH, 6);
+    ctx.fill();
+
+    ctx.fillStyle = '#9b8c7d';
+    ctx.font = '13px -apple-system,"PingFang SC",sans-serif';
+    ctx.fillText((data.balance||0).toLocaleString() + ' / ' + (data.goalAmount||10000).toLocaleString() + '  (' + pct + '%)', W/2, barY + 36);
+  }
+
+  // Recent timeline (last 3)
+  const tlY = data.goal ? 500 : 420;
+  ctx.fillStyle = '#3d3226';
+  ctx.font = 'bold 16px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('最近抱抱', W/2, tlY);
+
+  const recentTl = [...(data.timeline||[])].reverse().slice(0, 3);
+  recentTl.forEach((item, i) => {
+    const y = tlY + 30 + i * 40;
+    ctx.fillStyle = '#fdf0eb';
+    roundRect(ctx, 60, y, 480, 34, 12);
+    ctx.fill();
+    ctx.fillStyle = '#3d3226';
+    ctx.font = '14px -apple-system,"PingFang SC",sans-serif';
+    ctx.textAlign = 'left';
+    const shortMsg = item.from + ' → ' + (item.balanceAfter||'').toLocaleString() + '元';
+    ctx.fillText(shortMsg, 80, y + 23);
+  });
+  ctx.textAlign = 'center';
+
+  // QR code
+  const qrY = tlY + 180;
+  ctx.fillStyle = '#9b8c7d';
+  ctx.font = '13px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('扫码加入我们的抱抱许愿池', W/2, qrY);
+
+  if (qrImage && qrImage.complete) {
+    ctx.drawImage(qrImage, W/2 - 60, qrY + 10, 120, 120);
+  } else {
+    // Placeholder
+    ctx.fillStyle = '#f0e8e0';
+    ctx.fillRect(W/2 - 50, qrY + 10, 100, 100);
+    ctx.fillStyle = '#9b8c7d';
+    ctx.font = '11px -apple-system,"PingFang SC",sans-serif';
+    ctx.fillText('QR', W/2, qrY + 65);
+  }
+
+  // Footer
+  ctx.fillStyle = '#ccc';
+  ctx.font = '11px -apple-system,"PingFang SC",sans-serif';
+  ctx.fillText('抱抱许愿池 · 每一份心意都算数', W/2, H - 24);
+
+  // Wait for QR to load, then redraw
+  if (qrImage && !qrImage.complete) {
+    qrImage.onload = () => drawShareCard();
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function openShareCard() {
+  drawShareCard();
+  $('shareOverlay').classList.add('active');
+}
+
+function saveShareCard() {
+  const canvas = $('shareCanvas');
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '抱抱许愿池.png';
+    a.click();
+    URL.revokeObjectURL(url);
+    $('toastBar').textContent = '✅ 图片已保存，去微信发给 TA 吧';
+    $('toastBar').classList.add('show');
+    setTimeout(() => $('toastBar').classList.remove('show'), 3000);
+  }, 'image/png');
+}
+
+// ========== Events ==========
 $('btnHug').addEventListener('click', () => $('modalOverlay').classList.add('active'));
 $('btnCancel').addEventListener('click', () => $('modalOverlay').classList.remove('active'));
 $('modalOverlay').addEventListener('click', e => { if(e.target===$('modalOverlay')) $('modalOverlay').classList.remove('active'); });
@@ -398,6 +649,13 @@ $('btnConfirm').addEventListener('click', () => {
   setTimeout(() => { doHug(); showToast('🤗'); }, 200);
 });
 
+// Share card
+$('btnShareCard').addEventListener('click', openShareCard);
+$('btnCloseShare').addEventListener('click', () => $('shareOverlay').classList.remove('active'));
+$('shareOverlay').addEventListener('click', e => { if(e.target===$('shareOverlay')) $('shareOverlay').classList.remove('active'); });
+$('btnSaveShare').addEventListener('click', saveShareCard);
+
+// Settings
 $('btnSettings').addEventListener('click', () => {
   $('settingsPanel').classList.toggle('active');
 });
@@ -407,7 +665,7 @@ document.addEventListener('click', (e) => {
   }
 });
 $('inputWhoAmI').addEventListener('change', function() {
-  data.whoAmI = this.value; save(); render();
+  data.whoAmI = this.value; saveLocal(); pushToCloud(); render();
 });
 ['inputPartnerName','inputMyName','inputGoal','inputGoalAmount'].forEach(id => {
   $(id).addEventListener('change', () => {
@@ -415,34 +673,62 @@ $('inputWhoAmI').addEventListener('change', function() {
     data.myName = $('inputMyName').value.trim()||'老王';
     data.goal = $('inputGoal').value.trim();
     data.goalAmount = parseInt($('inputGoalAmount').value)||10000;
-    save(); render();
-    if (serverOnline) {
-      fetch(SERVER_URL + '/api/settings', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ partnerName:data.partnerName, myName:data.myName, goal:data.goal, goalAmount:data.goalAmount })
-      }).catch(()=>{});
-    }
+    saveLocal(); pushToCloud(); render();
   });
 });
 $('btnReset').addEventListener('click', () => {
   if (confirm('确定要清空所有数据吗？')) {
     data = { ...defaults, whoAmI: data.whoAmI };
-    save(); render();
+    saveLocal(); pushToCloud(); render();
     $('settingsPanel').classList.remove('active');
   }
 });
 
-// Init
-if ('Notification' in window && Notification.permission === 'default') {
-  Notification.requestPermission();
-}
-tryServer().then(ok => {
-  if (!ok) {
-    $('syncDot').className = 'sync-dot offline';
-    $('syncLabel').textContent = '本机模式（分享链接给TA）';
+// ========== Init ==========
+(async function() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
   }
-});
-render();
+  loadQRCode();
+  
+  const cloudOk = await initCloudBase();
+  if (!cloudOk) {
+    // Try legacy server as fallback
+    const SVR = 'https://90d61849d58ffe.lhr.life';
+    try {
+      const res = await fetch(SVR + '/api/data', { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const srv = await res.json();
+        mergeServerData(srv);
+        setSyncState('online', '本地服务器同步中 (SSE)');
+        connectSSE(SVR);
+      }
+    } catch(e) {
+      setSyncState('offline', '本机模式 · 设置 CloudBase 后实时同步');
+    }
+  }
+  render();
+})();
+
+function connectSSE(svr) {
+  const es = new EventSource(svr + '/api/sse');
+  es.onopen = () => setSyncState('online', '实时同步中');
+  es.addEventListener('state', (e) => {
+    try {
+      mergeServerData(JSON.parse(e.data));
+    } catch(ex) {}
+  });
+  es.addEventListener('hug', (e) => {
+    try {
+      const hug = JSON.parse(e.data);
+      if (hug.from !== data.whoAmI) {
+        showToast('🤗');
+        notifyMe(hug.message);
+      }
+    } catch(ex) {}
+  });
+  es.onerror = () => setSyncState('offline', '连接断开 · 数据已保存在本地');
+}
 </script>
 </body>
 </html>
