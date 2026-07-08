@@ -248,7 +248,7 @@ body {
 </div>
 
 <!-- CloudBase SDK -->
-<script src="//imgcache.qq.com/qcloud/cloudbase-js-sdk/1.8.0/cloudbase.full.js"></script>
+<script src="https://imgcache.qq.com/qcloud/cloudbase-js-sdk/1.8.1/cloudbase.full.js"></script>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -281,41 +281,65 @@ function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); 
 
 // ========== CloudBase init ==========
 async function initCloudBase() {
-  if (CB_ENV_ID === 'YOUR_ENV_ID') {
-    setSyncState('offline', '本机模式 · 配置 CloudBase 后开启实时同步');
+  // Wait for SDK to load
+  let retries = 0;
+  while (!window.cloudbase && retries < 30) {
+    await new Promise(r => setTimeout(r, 500));
+    retries++;
+  }
+  if (!window.cloudbase) {
+    setSyncState('offline', 'CloudBase SDK 加载失败，检查网络');
     return false;
   }
+
   try {
     cloudbase = window.cloudbase.init({ env: CB_ENV_ID });
+    
+    // Try anonymous login
     const auth = cloudbase.auth({ persistence: 'local' });
-    await auth.anonymousAuthProvider().signIn();
+    let loginRes;
+    try {
+      loginRes = await auth.anonymousAuthProvider().signIn();
+    } catch(e1) {
+      // Fallback: try newer API
+      try {
+        loginRes = await auth.signInAnonymously();
+      } catch(e2) {
+        setSyncState('offline', 'CloudBase 登录失败：请在控制台开启匿名登录');
+        return false;
+      }
+    }
+    
     db = cloudbase.database();
     cloudReady = true;
 
-    // Watch for real-time changes
-    db.collection('hugfund').doc('shared').watch({
-      onChange(snapshot) {
-        const docs = snapshot.docs;
-        if (docs && docs.length > 0) {
-          const srv = docs[0];
-          // Don't overwrite if the change came from us (avoid loops)
-          if (srv._from !== data.whoAmI || Date.now() - (srv._ts || 0) > 2000) {
-            mergeServerData(srv);
-          }
-        }
-      },
-      onError(e) {
-        console.warn('CloudBase watch error:', e);
-      }
-    });
-
-    // Pull initial state
+    // Try to pull initial state (create doc if missing)
     await pullFromCloud();
+
+    // Set up watch for real-time (with polling fallback)
+    try {
+      const watcher = db.collection('hugfund').doc('shared');
+      if (typeof watcher.watch === 'function') {
+        watcher.watch({
+          onChange(snapshot) {
+            if (snapshot.docs && snapshot.docs.length > 0) {
+              mergeServerData(snapshot.docs[0]);
+            }
+          },
+          onError(e) { /* silent */ }
+        });
+      }
+    } catch(e) { /* watch not supported, use polling */ }
+
+    // Polling fallback every 2 seconds (works even without watch)
+    setInterval(async () => {
+      if (cloudReady) await pullFromCloud();
+    }, 2000);
+
     setSyncState('cloud', 'CloudBase 实时同步中');
     return true;
   } catch(e) {
-    console.warn('CloudBase init failed:', e);
-    setSyncState('offline', 'CloudBase 连接失败 · 使用本机模式');
+    setSyncState('offline', 'CloudBase 连接失败：' + (e.message || e).toString().slice(0, 40));
     return false;
   }
 }
@@ -324,22 +348,35 @@ async function pullFromCloud() {
   if (!cloudReady) return;
   try {
     const res = await db.collection('hugfund').doc('shared').get();
-    if (res.data && res.data.length > 0) {
+    if (res.data && res.data.length > 0 && res.data[0]) {
       mergeServerData(res.data[0]);
     }
   } catch(e) {
-    // Document doesn't exist yet — that's fine
+    // Document might not exist — create it from local data
+    if (String(e).includes('not found') || String(e).includes('not exist')) {
+      await pushToCloud();
+    }
   }
 }
 
 function mergeServerData(srv) {
+  if (!srv || typeof srv !== 'object') return;
   let changed = false;
-  if (srv.balance !== undefined && srv.balance > (data.balance || 0)) { data.balance = srv.balance; changed = true; }
-  if (srv.myHugs !== undefined) { data.myHugs = srv.myHugs; changed = true; }
-  if (srv.taHugs !== undefined) { data.taHugs = srv.taHugs; changed = true; }
-  if (srv.timeline) { data.timeline = srv.timeline; changed = true; }
-  if (srv.goal) { data.goal = srv.goal; changed = true; }
-  if (srv.goalAmount) { data.goalAmount = srv.goalAmount; changed = true; }
+  // Use server balance if it's higher (both sides accumulate)
+  if (typeof srv.balance === 'number' && srv.balance >= (data.balance || 0)) { data.balance = srv.balance; changed = true; }
+  // Use server hug counts if they exist and are >= local
+  if (typeof srv.myHugs === 'number' && srv.myHugs >= (data.myHugs || 0)) { data.myHugs = srv.myHugs; changed = true; }
+  if (typeof srv.taHugs === 'number' && srv.taHugs >= (data.taHugs || 0)) { data.taHugs = srv.taHugs; changed = true; }
+  // Server timeline is authoritative (merge, dedupe by id)
+  if (Array.isArray(srv.timeline)) {
+    const ids = new Set(data.timeline.map(e => e.id));
+    for (const e of srv.timeline) {
+      if (!ids.has(e.id)) { data.timeline.push(e); ids.add(e.id); }
+    }
+    changed = true;
+  }
+  if (srv.goal && srv.goal !== data.goal) { data.goal = srv.goal; changed = true; }
+  if (srv.goalAmount && srv.goalAmount !== data.goalAmount) { data.goalAmount = srv.goalAmount; changed = true; }
   if (srv.partnerName) { data.partnerName = srv.partnerName; changed = true; }
   if (srv.myName) { data.myName = srv.myName; changed = true; }
   if (changed) { saveLocal(); render(); }
@@ -357,11 +394,26 @@ async function pushToCloud() {
       goalAmount: data.goalAmount,
       partnerName: data.partnerName,
       myName: data.myName,
-      _from: data.whoAmI,
       _ts: Date.now()
     });
   } catch(e) {
-    console.warn('CloudBase push failed:', e);
+    // If set fails, try add (doc might not exist)
+    try {
+      await db.collection('hugfund').add({
+        _id: 'shared',
+        balance: data.balance,
+        myHugs: data.myHugs,
+        taHugs: data.taHugs,
+        timeline: data.timeline,
+        goal: data.goal,
+        goalAmount: data.goalAmount,
+        partnerName: data.partnerName,
+        myName: data.myName,
+        _ts: Date.now()
+      });
+    } catch(e2) {
+      // Silently fail — data is still in localStorage
+    }
   }
 }
 
