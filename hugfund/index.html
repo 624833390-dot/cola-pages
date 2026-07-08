@@ -286,9 +286,7 @@ async function initCloud() {
   try {
     setSyncState('offline', '连接中…');
     // Try to fetch existing cloud data
-    const resp = await fetchWithTimeout(FB_REST_URL + '/state.json', {}, 8000);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const srv = await resp.json();
+    const srv = await fetchJSON(FB_REST_URL + '/state.json', 8000);
     if (srv) mergeFromCloud(srv);
 
     // If local has data but cloud is empty, push up
@@ -303,42 +301,46 @@ async function initCloud() {
     pollTimer = setInterval(pollCloud, 5000);
     return true;
   } catch(e) {
-    setSyncState('offline', '云同步失败：' + (e.message||String(e)).slice(0, 40));
+    var msg = e.message || String(e);
+    // More helpful messages
+    if (msg.indexOf('timeout') >= 0) msg = '网络超时（需VPN？）';
+    else if (msg.indexOf('Failed to fetch') >= 0) msg = '无法连接（网络限制）';
+    setSyncState('offline', '☁️ ' + msg.slice(0, 30));
     // Retry in 15 seconds
-    setTimeout(() => { if (!cloudReady) initCloud(); }, 15000);
+    setTimeout(function() { if (!cloudReady) initCloud(); }, 15000);
     return false;
   }
 }
 
-function fetchWithTimeout(url, opts, ms) {
-  var ctrl = new AbortController();
-  var timer = setTimeout(() => ctrl.abort(), ms);
-  opts.signal = ctrl.signal;
-  return fetch(url, opts).finally(() => clearTimeout(timer));
+// Simple fetch with timeout — no AbortController / .finally() dependency
+function fetchJSON(url, ms) {
+  return Promise.race([
+    fetch(url).then(function(r) { return r.ok ? r.json() : null; }),
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('timeout ' + ms + 'ms')); }, ms);
+    })
+  ]);
 }
 
 async function pollCloud() {
   try {
-    const resp = await fetchWithTimeout(FB_REST_URL + '/state.json', {}, 6000);
-    if (!resp.ok) return;
-    const srv = await resp.json();
+    const srv = await fetchJSON(FB_REST_URL + '/state.json', 6000);
     if (srv) mergeFromCloud(srv);
 
     // Also check for new timeline entries
-    const tlResp = await fetchWithTimeout(FB_REST_URL + '/timeline.json', {}, 6000);
-    if (tlResp.ok) {
-      const tlSrv = await tlResp.json();
-      if (tlSrv && typeof tlSrv === 'object') {
-        const ids = new Set(data.timeline.map(e => e.id));
-        let added = false;
-        Object.values(tlSrv).forEach(entry => {
-          if (entry && entry.id && !ids.has(entry.id)) {
-            data.timeline.push(entry);
-            added = true;
-          }
-        });
-        if (added) { saveLocal(); render(); }
-      }
+    const tlSrv = await fetchJSON(FB_REST_URL + '/timeline.json', 6000);
+    if (tlSrv && typeof tlSrv === 'object') {
+      var ids = {};
+      data.timeline.forEach(function(e) { ids[e.id] = true; });
+      var added = false;
+      Object.keys(tlSrv).forEach(function(k) {
+        var entry = tlSrv[k];
+        if (entry && entry.id && !ids[entry.id]) {
+          data.timeline.push(entry);
+          added = true;
+        }
+      });
+      if (added) { saveLocal(); render(); }
     }
   } catch(e) { /* silent — will retry next poll */ }
 }
@@ -356,32 +358,38 @@ function mergeFromCloud(srv) {
   if (changed) { saveLocal(); render(); }
 }
 
+// Simple PUT with timeout
+function putJSON(url, body, ms) {
+  return Promise.race([
+    fetch(url, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    }),
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('timeout ' + ms + 'ms')); }, ms);
+    })
+  ]);
+}
+
 async function pushToCloud() {
   if (!cloudReady) return;
   try {
     // Push state
-    await fetchWithTimeout(FB_REST_URL + '/state.json', {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        balance: data.balance,
-        myHugs: data.myHugs,
-        taHugs: data.taHugs,
-        goal: data.goal,
-        goalAmount: data.goalAmount,
-        partnerName: data.partnerName,
-        myName: data.myName
-      })
+    await putJSON(FB_REST_URL + '/state.json', {
+      balance: data.balance,
+      myHugs: data.myHugs,
+      taHugs: data.taHugs,
+      goal: data.goal,
+      goalAmount: data.goalAmount,
+      partnerName: data.partnerName,
+      myName: data.myName
     }, 6000);
 
     // Push new timeline entries (only the last one that was just added)
     if (data.timeline.length > 0) {
       const last = data.timeline[data.timeline.length - 1];
-      await fetchWithTimeout(FB_REST_URL + '/timeline/' + last.id + '.json', {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(last)
-      }, 6000);
+      await putJSON(FB_REST_URL + '/timeline/' + last.id + '.json', last, 6000);
     }
   } catch(e) { /* silent — data is in localStorage */ }
 }
@@ -718,10 +726,13 @@ $('btnReset').addEventListener('click', () => {
   }
   loadQRCode();
   
-  const cloudOk = await initCloud();
-  if (!cloudOk) {
-    // Cloud failed — the sync label already shows why. Local data still works.
-  }
+  // Cloud sync — non-blocking, don't let it freeze the UI
+  initCloud().then(function(ok) {
+    if (!ok) {
+      // Cloud failed but local data still works — label already shows why
+    }
+  });
+  // Render immediately, don't wait for cloud
   render();
 })();
 </script>
