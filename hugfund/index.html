@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>抱抱许愿池</title>
+<style>
+:root {
+  --bg: #faf7f4;
+  --card: #fffbf8;
+  --text: #3d3226;
+  --sub: #9b8c7d;
+  --accent: #e8856d;
+  --gold: #c8963e;
+  --shadow: 0 2px 16px rgba(60,30,10,.06);
+  --radius: 20px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  background:var(--bg); color:var(--text); min-height:100vh;
+  -webkit-font-smoothing:antialiased; padding-bottom:80px;
+}
+.toast-bar {
+  position:fixed; top:0; left:0; right:0; background:#4caf50; color:#fff;
+  text-align:center; padding:12px; font-size:14px; font-weight:600;
+  transform:translateY(-100%); transition:transform .3s; z-index:300;
+}
+.toast-bar.show { transform:translateY(0); }
+.header { text-align:center; padding:36px 24px 24px; }
+.header .icon { font-size:48px; animation:float 3s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+.header h1 { font-size:22px; font-weight:600; letter-spacing:.5px; margin:4px 0; }
+.header .subtitle { font-size:13px; color:var(--sub); }
+.balance-card {
+  margin:0 20px 20px; background:var(--card); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:24px; text-align:center; position:relative; overflow:hidden;
+}
+.balance-card::before {
+  content:''; position:absolute; top:-40px; right:-40px;
+  width:120px; height:120px;
+  background:radial-gradient(circle,rgba(232,133,109,.08) 0%,transparent 70%); border-radius:50%;
+}
+.balance-label { font-size:12px; color:var(--sub); letter-spacing:1px; margin-bottom:6px; }
+.balance-amount { font-size:42px; font-weight:700; color:var(--gold); letter-spacing:-1px; position:relative; z-index:1; }
+.balance-amount .unit { font-size:16px; font-weight:400; margin-left:2px; }
+.balance-stats { display:flex; justify-content:center; gap:32px; margin-top:12px; font-size:12px; color:var(--sub); }
+.balance-stats span strong { color:var(--text); font-weight:600; }
+.goal-bar-wrap { margin:0 20px 20px; background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 20px; display:none; }
+.goal-bar-label { font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; justify-content:space-between; }
+.goal-bar-label .goal-name { color:var(--text); font-weight:500; }
+.goal-bar { height:6px; background:#f0e8e0; border-radius:3px; overflow:hidden; }
+.goal-bar-fill { height:100%; background:linear-gradient(90deg,#e8856d,#c8963e); border-radius:3px; transition:width .5s ease; }
+.hug-section { margin:0 20px 28px; text-align:center; }
+.btn-hug {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; max-width:320px; padding:18px 0;
+  background:var(--accent); color:#fff; border:none; border-radius:50px;
+  font-size:17px; font-weight:600; letter-spacing:.5px;
+  box-shadow:0 4px 20px rgba(232,133,109,.3); cursor:pointer;
+  transition:transform .15s,box-shadow .15s; -webkit-tap-highlight-color:transparent;
+}
+.btn-hug:active { transform:scale(.97); box-shadow:0 2px 12px rgba(232,133,109,.2); }
+.btn-hug .emoji { font-size:22px; }
+.hug-hint { font-size:12px; color:var(--sub); margin-top:10px; }
+
+.modal-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center;
+  z-index:100; opacity:0; pointer-events:none; transition:opacity .25s;
+}
+.modal-overlay.active { opacity:1; pointer-events:auto; }
+.modal {
+  background:var(--card); border-radius:var(--radius); padding:28px 24px 20px;
+  width:calc(100% - 48px); max-width:340px; text-align:center;
+  box-shadow:0 8px 40px rgba(0,0,0,.12);
+}
+.modal .m-emoji { font-size:40px; margin-bottom:8px; }
+.modal .m-title { font-size:16px; font-weight:600; margin-bottom:8px; }
+.modal .m-desc { font-size:13px; color:var(--sub); line-height:1.6; margin-bottom:20px; }
+.modal .m-actions { display:flex; gap:12px; }
+.modal .m-actions button { flex:1; padding:12px; border-radius:50px; font-size:15px; font-weight:600; border:none; cursor:pointer; }
+.modal .m-actions button:active { transform:scale(.96); }
+.btn-cancel { background:#f0e8e0; color:var(--sub); }
+.btn-confirm { background:var(--accent); color:#fff; }
+
+.hug-toast {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(.5);
+  font-size:64px; z-index:200; pointer-events:none; opacity:0;
+}
+.hug-toast.show { animation:toastBounce .7s ease forwards; }
+@keyframes toastBounce {
+  0% { opacity:1; transform:translate(-50%,-50%) scale(.5); }
+  50% { opacity:1; transform:translate(-50%,-50%) scale(1.2); }
+  70% { opacity:1; transform:translate(-50%,-50%) scale(.95); }
+  100% { opacity:0; transform:translate(-50%,-60%) scale(1); }
+}
+
+.timeline-section { margin:0 20px; }
+.timeline-title { font-size:14px; font-weight:600; color:var(--sub); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.timeline-list { list-style:none; }
+.timeline-item {
+  background:var(--card); border-radius:14px; padding:14px 16px;
+  margin-bottom:8px; box-shadow:0 1px 6px rgba(60,30,10,.03);
+  display:flex; align-items:center; gap:12px;
+  animation:slideIn .3s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.tl-avatar { width:40px; height:40px; border-radius:50%; background:#fdf0eb; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+.tl-body { flex:1; min-width:0; }
+.tl-body .tl-message { font-size:14px; line-height:1.5; }
+.tl-body .tl-amount { font-size:12px; color:var(--gold); font-weight:600; margin-top:2px; }
+.tl-time { font-size:11px; color:var(--sub); flex-shrink:0; }
+.empty-state { text-align:center; padding:32px 0; color:var(--sub); font-size:13px; }
+
+.sync-indicator {
+  text-align:center; font-size:11px; color:var(--sub); margin-top:8px;
+  display:flex; align-items:center; justify-content:center; gap:4px;
+}
+.sync-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+.sync-dot.online { background:#4caf50; }
+.sync-dot.offline { background:#ccc; }
+
+.settings-toggle { position:fixed; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:var(--card); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; z-index:50; border:none; color:var(--sub); -webkit-tap-highlight-color:transparent; }
+.settings-panel { position:fixed; bottom:0; left:0; width:100%; background:var(--card); border-radius:24px 24px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,.08); z-index:90; padding:24px 24px 36px; transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1); }
+.settings-panel.active { transform:translateY(0); }
+.settings-panel h3 { font-size:16px; margin-bottom:16px; }
+.settings-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #f0e8e0; }
+.settings-row label { font-size:14px; }
+.settings-row input, .settings-row select { padding:8px 12px; border:1px solid #e8dcd0; border-radius:10px; font-size:14px; background:var(--bg); }
+.settings-row input { width:120px; text-align:right; }
+.btn-reset { width:100%; margin-top:16px; padding:12px; background:transparent; border:1px solid #e8dcd0; border-radius:14px; font-size:14px; color:var(--sub); cursor:pointer; }
+.settings-hint { font-size:11px; color:var(--sub); margin-top:12px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div class="toast-bar" id="toastBar"></div>
+
+<div class="header">
+  <div class="icon">🤗</div>
+  <h1>抱抱许愿池</h1>
+  <div class="subtitle" id="partnerLabel">给 安妮</div>
+</div>
+
+<div class="balance-card">
+  <div class="balance-label">💛 心愿基金</div>
+  <div class="balance-amount" id="balanceDisplay">0<span class="unit">元</span></div>
+  <div class="balance-stats">
+    <span>我：<strong id="myCount">0</strong>次</span>
+    <span>TA：<strong id="taCount">0</strong>次</span>
+  </div>
+</div>
+
+<div class="goal-bar-wrap" id="goalBarWrap">
+  <div class="goal-bar-label">
+    <span>🎯 <span class="goal-name" id="goalName"></span></span>
+    <span id="goalProgress"></span>
+  </div>
+  <div class="goal-bar"><div class="goal-bar-fill" id="goalFill" style="width:0%"></div></div>
+</div>
+
+<div class="hug-section">
+  <button class="btn-hug" id="btnHug">
+    <span class="emoji">🤗</span> 感觉 TA 不开心
+  </button>
+  <div class="hug-hint">按一下 · 基金+1000 · TA收到抱抱</div>
+  <div class="sync-indicator">
+    <span class="sync-dot offline" id="syncDot"></span>
+    <span id="syncLabel">本机模式（分享链接给TA同步查看）</span>
+  </div>
+</div>
+
+<div class="timeline-section">
+  <div class="timeline-title">📖 我们的抱抱</div>
+  <ul class="timeline-list" id="timelineList"></ul>
+  <div class="empty-state" id="emptyState">还没有抱抱。按一下上面的按钮，送出第一个。</div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="m-emoji">🤗</div>
+    <div class="m-title">感觉 <span id="modalTaName">安妮</span> 不开心？</div>
+    <div class="m-desc">往心愿基金转入 <strong style="color:#c8963e">¥1,000</strong><br>同时给 TA 一个抱抱</div>
+    <div class="m-actions">
+      <button class="btn-cancel" id="btnCancel">再想想</button>
+      <button class="btn-confirm" id="btnConfirm">抱抱 🤗</button>
+    </div>
+  </div>
+</div>
+
+<div class="hug-toast" id="hugToast">🤗</div>
+
+<button class="settings-toggle" id="btnSettings">⚙️</button>
+<div class="settings-panel" id="settingsPanel">
+  <h3>设置</h3>
+  <div class="settings-row"><label>我是谁</label><select id="inputWhoAmI"><option value="老王">老王</option><option value="安妮">安妮</option></select></div>
+  <div class="settings-row"><label>TA 的名字</label><input type="text" id="inputPartnerName" value="安妮"></div>
+  <div class="settings-row"><label>我的名字</label><input type="text" id="inputMyName" value="老王"></div>
+  <div class="settings-row"><label>心愿目标</label><input type="text" id="inputGoal" placeholder="比如：去大理"></div>
+  <div class="settings-row"><label>目标金额</label><input type="number" id="inputGoalAmount" value="10000"></div>
+  <button class="btn-reset" id="btnReset">重置所有数据</button>
+  <div class="settings-hint">数据保存在你的手机/电脑本地。<br>想跟 TA 同步？截图分享余额页，或两人一起打开这个链接。</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const STORAGE_KEY = 'hugfund_v2';
+
+// Default data
+const defaults = {
+  balance: 0, myHugs: 0, taHugs: 0,
+  goal: '', goalAmount: 10000,
+  partnerName: '安妮', myName: '老王',
+  whoAmI: '老王',
+  timeline: []
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return { ...defaults, ...JSON.parse(raw) };
+  } catch(e) {}
+  return { ...defaults };
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+let data = load();
+
+// Try server connection
+const SERVER_URL = '';
+let serverOnline = false;
+
+async function tryServer() {
+  try {
+    const res = await fetch(SERVER_URL + '/api/data', { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      serverOnline = true;
+      const srv = await res.json();
+      // Merge: server data wins for balance/timeline
+      data.balance = srv.balance || 0;
+      data.myHugs = srv.myHugs || 0;
+      data.taHugs = srv.taHugs || 0;
+      data.timeline = srv.timeline || [];
+      if (srv.goal) data.goal = srv.goal;
+      if (srv.goalAmount) data.goalAmount = srv.goalAmount;
+      if (srv.partnerName) data.partnerName = srv.partnerName;
+      if (srv.myName) data.myName = srv.myName;
+      save();
+      render();
+      connectSSE();
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function connectSSE() {
+  const es = new EventSource(SERVER_URL + '/api/sse');
+  es.onopen = () => { $('syncDot').className = 'sync-dot online'; $('syncLabel').textContent = '实时同步中'; };
+  es.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      data.balance = d.balance || 0;
+      data.myHugs = d.myHugs || 0;
+      data.taHugs = d.taHugs || 0;
+      data.timeline = d.timeline || [];
+      data.partnerName = d.partnerName || data.partnerName;
+      data.myName = d.myName || data.myName;
+      data.goal = d.goal || data.goal;
+      data.goalAmount = d.goalAmount || data.goalAmount;
+      save(); render();
+    } catch(ex) {}
+  };
+  es.addEventListener('hug', (e) => {
+    try {
+      const hug = JSON.parse(e.data);
+      if (hug.from !== data.whoAmI) {
+        showToast('🤗');
+        notifyMe(hug.message);
+      }
+    } catch(ex) {}
+  });
+  es.addEventListener('state', (e) => {
+    try {
+      const state = JSON.parse(e.data);
+      Object.assign(data, state);
+      save(); render();
+    } catch(ex) {}
+  });
+  es.onerror = () => {
+    $('syncDot').className = 'sync-dot offline';
+    $('syncLabel').textContent = '服务器连接断开 · 数据保存在本地';
+  };
+}
+
+function render() {
+  const d = data;
+  $('partnerLabel').textContent = '给 ' + (d.partnerName || 'Annie');
+  $('balanceDisplay').innerHTML = (d.balance||0).toLocaleString() + '<span class="unit">元</span>';
+  $('myCount').textContent = d.myHugs || 0;
+  $('taCount').textContent = d.taHugs || 0;
+
+  if (d.goal) {
+    $('goalBarWrap').style.display = 'block';
+    $('goalName').textContent = d.goal;
+    const pct = Math.min(100, Math.round((d.balance||0) / (d.goalAmount||10000) * 100));
+    $('goalProgress').textContent = (d.balance||0).toLocaleString() + ' / ' + (d.goalAmount||10000).toLocaleString();
+    $('goalFill').style.width = pct + '%';
+  } else {
+    $('goalBarWrap').style.display = 'none';
+  }
+
+  const tl = d.timeline || [];
+  $('timelineList').innerHTML = '';
+  if (!tl.length) {
+    $('emptyState').style.display = 'block';
+  } else {
+    $('emptyState').style.display = 'none';
+    [...tl].reverse().forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'timeline-item';
+      const t = item.time ? new Date(item.time.replace(' ','T')) : new Date();
+      li.innerHTML = `
+        <div class="tl-avatar">${item.emoji||'🤗'}</div>
+        <div class="tl-body">
+          <div class="tl-message">${esc(item.message||'')}</div>
+          <div class="tl-amount">+¥1,000 · 余额 ¥${(item.balanceAfter||0).toLocaleString()}</div>
+        </div>
+        <div class="tl-time">${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</div>`;
+      $('timelineList').appendChild(li);
+    });
+  }
+
+  $('modalTaName').textContent = d.partnerName || 'Annie';
+  $('inputPartnerName').value = d.partnerName || 'Annie';
+  $('inputMyName').value = d.myName || 'Alex';
+  $('inputGoal').value = d.goal || '';
+  $('inputGoalAmount').value = d.goalAmount || 10000;
+  $('inputWhoAmI').value = d.whoAmI || 'Alex';
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function doHug() {
+  const now = new Date().toISOString();
+  const msg = data.whoAmI + ' 感觉 ' + data.partnerName + ' 不太开心，给了一个抱抱';
+  data.balance += 1000;
+  if (data.whoAmI === 'Alex') data.myHugs++; else data.taHugs++;
+  const entry = {
+    id: Math.random().toString(36).slice(2,10),
+    time: now,
+    message: msg,
+    from: data.whoAmI,
+    emoji: '🤗',
+    amount: 1000,
+    balanceAfter: data.balance
+  };
+  data.timeline.push(entry);
+  save(); render();
+
+  // Try server sync
+  if (serverOnline) {
+    fetch(SERVER_URL + '/api/hug', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ from: data.whoAmI })
+    }).catch(()=>{});
+  }
+}
+
+let toastTimer;
+function showToast(emoji) {
+  $('hugToast').textContent = emoji||'🤗';
+  $('hugToast').classList.remove('show');
+  void $('hugToast').offsetWidth;
+  $('hugToast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('hugToast').classList.remove('show'), 800);
+}
+function notifyMe(msg) {
+  if (Notification.permission === 'granted') {
+    new Notification('🤗 抱抱基金', { body: msg });
+  }
+  $('toastBar').textContent = msg;
+  $('toastBar').classList.add('show');
+  setTimeout(() => $('toastBar').classList.remove('show'), 4000);
+}
+
+// Events
+$('btnHug').addEventListener('click', () => $('modalOverlay').classList.add('active'));
+$('btnCancel').addEventListener('click', () => $('modalOverlay').classList.remove('active'));
+$('modalOverlay').addEventListener('click', e => { if(e.target===$('modalOverlay')) $('modalOverlay').classList.remove('active'); });
+$('btnConfirm').addEventListener('click', () => {
+  $('modalOverlay').classList.remove('active');
+  setTimeout(() => { doHug(); showToast('🤗'); }, 200);
+});
+
+$('btnSettings').addEventListener('click', () => {
+  $('settingsPanel').classList.toggle('active');
+});
+document.addEventListener('click', (e) => {
+  if (!$('settingsPanel').contains(e.target) && e.target !== $('btnSettings')) {
+    $('settingsPanel').classList.remove('active');
+  }
+});
+$('inputWhoAmI').addEventListener('change', function() {
+  data.whoAmI = this.value; save(); render();
+});
+['inputPartnerName','inputMyName','inputGoal','inputGoalAmount'].forEach(id => {
+  $(id).addEventListener('change', () => {
+    data.partnerName = $('inputPartnerName').value.trim()||'安妮';
+    data.myName = $('inputMyName').value.trim()||'老王';
+    data.goal = $('inputGoal').value.trim();
+    data.goalAmount = parseInt($('inputGoalAmount').value)||10000;
+    save(); render();
+    if (serverOnline) {
+      fetch(SERVER_URL + '/api/settings', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ partnerName:data.partnerName, myName:data.myName, goal:data.goal, goalAmount:data.goalAmount })
+      }).catch(()=>{});
+    }
+  });
+});
+$('btnReset').addEventListener('click', () => {
+  if (confirm('确定要清空所有数据吗？')) {
+    data = { ...defaults, whoAmI: data.whoAmI };
+    save(); render();
+    $('settingsPanel').classList.remove('active');
+  }
+});
+
+// Init
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+tryServer().then(ok => {
+  if (!ok) {
+    $('syncDot').className = 'sync-dot offline';
+    $('syncLabel').textContent = '本机模式（分享链接给TA）';
+  }
+});
+render();
+</script>
+</body>
+</html>
