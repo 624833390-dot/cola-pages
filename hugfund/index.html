@@ -246,20 +246,29 @@ body {
   <div class="settings-row"><label>心愿目标</label><input type="text" id="inputGoal" placeholder="比如：去大理"></div>
   <div class="settings-row"><label>目标金额</label><input type="number" id="inputGoalAmount" value="10000"></div>
   <button class="btn-reset" id="btnReset">重置所有数据</button>
-  <div class="settings-hint" id="syncHelp">数据保存在本地 + CloudBase 实时同步。<br>两人打开页面后，抱抱记录自动同步。</div>
+  <div class="settings-hint" id="syncHelp">数据保存在本地 + Firebase 实时同步。<br>两人打开页面后，抱抱记录自动同步。</div>
 </div>
 
-<!-- CloudBase SDK -->
-<script src="https://imgcache.qq.com/qcloud/cloudbase-js-sdk/1.6.0/cloudbase.full.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <script>
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'hugfund_v2';
 
-// ========== CloudBase config ==========
-const CB_ENV_ID = 'hugfund-d6gawu444222c10c1';
+// ========== Firebase config ==========
+const FB_CONFIG = {
+  apiKey: "AIzaSyDATeET0_g5SE0Q-yejxycrIlPdGOtwkNM",
+  authDomain: "hugfund-26222.firebaseapp.com",
+  databaseURL: "https://hugfund-26222-default-rtdb.firebaseio.com",
+  projectId: "hugfund-26222",
+  storageBucket: "hugfund-26222.firebasestorage.app",
+  messagingSenderId: "491595453257",
+  appId: "1:491595453257:web:ac3a30903ce2ce4041c098"
+};
 const PAGE_URL = 'https://624833390-dot.github.io/cola-pages/hugfund/';
-let cloudbase, db, cloudReady = false;
+let firebase, db, fbReady = false;
 
 // ========== Defaults ==========
 const defaults = {
@@ -281,168 +290,82 @@ function loadLocal() {
 }
 function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
-// ========== CloudBase init ==========
-async function initCloudBase() {
-  // Wait for SDK to load
-  let retries = 0;
-  while (!window.cloudbase && retries < 30) {
-    await new Promise(r => setTimeout(r, 500));
-    retries++;
-  }
-  if (!window.cloudbase) {
-    setSyncState('offline', 'CloudBase SDK 加载失败，检查网络');
+// ========== Firebase init ==========
+async function initFirebase() {
+  if (!window.firebase) {
+    setSyncState('offline', 'Firebase SDK 加载失败，检查网络');
     return false;
   }
-
   try {
-    cloudbase = window.cloudbase.init({ env: CB_ENV_ID });
-    
-    // Try anonymous login — multiple API variants
-    let loginOk = false;
-    let lastErr = '';
-    
-    // Variant 1: auth({persistence}).anonymousAuthProvider().signIn()
-    try {
-      const auth = cloudbase.auth({ persistence: 'local' });
-      await auth.anonymousAuthProvider().signIn();
-      loginOk = true;
-    } catch(e1) { lastErr = 'v1:' + (e1.message||e1).slice(0,30); }
-    
-    // Variant 2: auth().signInAnonymously()
-    if (!loginOk) {
-      try {
-        const auth = cloudbase.auth();
-        await auth.signInAnonymously();
-        loginOk = true;
-      } catch(e2) { lastErr += ' v2:' + (e2.message||e2).slice(0,30); }
-    }
-    
-    // Variant 3: auth().anonymousAuthProvider().signIn() (no persistence)
-    if (!loginOk) {
-      try {
-        const auth = cloudbase.auth();
-        await auth.anonymousAuthProvider().signIn();
-        loginOk = true;
-      } catch(e3) { lastErr += ' v3:' + (e3.message||e3).slice(0,30); }
-    }
-    
-    // Variant 4: cloudbase.auth().signInWithTicket() or just init?
-    if (!loginOk) {
-      try {
-        await cloudbase.auth({ persistence: 'local' }).signInAnonymously();
-        loginOk = true;
-      } catch(e4) { lastErr += ' v4:' + (e4.message||e4).slice(0,30); }
-    }
-    
-    if (!loginOk) {
-      setSyncState('offline', '登录失败: ' + lastErr.slice(0, 60));
-      return false;
-    }
-    
-    db = cloudbase.database();
-    cloudReady = true;
+    firebase.initializeApp(FB_CONFIG);
+    db = firebase.database();
+    fbReady = true;
 
-    // Try to pull initial state (create doc if missing)
-    await pullFromCloud();
+    // Real-time sync: listen for all changes
+    db.ref('hugfund/state').on('value', (snap) => {
+      const srv = snap.val();
+      if (srv) mergeFromFirebase(srv);
+    });
 
-    // Set up watch for real-time (with polling fallback)
-    try {
-      const watcher = db.collection('hugfund').doc('shared');
-      if (typeof watcher.watch === 'function') {
-        watcher.watch({
-          onChange(snapshot) {
-            if (snapshot.docs && snapshot.docs.length > 0) {
-              mergeServerData(snapshot.docs[0]);
-            }
-          },
-          onError(e) { /* silent */ }
-        });
+    // Real-time timeline: listen for new entries
+    db.ref('hugfund/timeline').on('child_added', (snap) => {
+      const entry = snap.val();
+      if (entry) {
+        const ids = new Set(data.timeline.map(e => e.id));
+        if (!ids.has(entry.id)) {
+          data.timeline.push(entry);
+          saveLocal(); render();
+        }
       }
-    } catch(e) { /* watch not supported, use polling */ }
+    });
 
-    // Polling fallback every 2 seconds (works even without watch)
-    setInterval(async () => {
-      if (cloudReady) await pullFromCloud();
-    }, 2000);
+    // Push local data up initially (if local has data and server doesn't)
+    const snap = await db.ref('hugfund/state').once('value');
+    if (!snap.val() && data.balance > 0) {
+      await pushToFirebase();
+    }
 
-    setSyncState('cloud', 'CloudBase 实时同步中');
+    setSyncState('cloud', 'Firebase 实时同步中');
     return true;
   } catch(e) {
-    setSyncState('offline', 'CloudBase 连接失败：' + (e.message || e).toString().slice(0, 40));
+    setSyncState('offline', 'Firebase 连接失败：' + (e.message||e).toString().slice(0,40));
     return false;
   }
 }
 
-async function pullFromCloud() {
-  if (!cloudReady) return;
-  try {
-    const res = await db.collection('hugfund').doc('shared').get();
-    if (res.data && res.data.length > 0 && res.data[0]) {
-      mergeServerData(res.data[0]);
-    }
-  } catch(e) {
-    // Document might not exist — create it from local data
-    if (String(e).includes('not found') || String(e).includes('not exist')) {
-      await pushToCloud();
-    }
-  }
-}
-
-function mergeServerData(srv) {
+function mergeFromFirebase(srv) {
   if (!srv || typeof srv !== 'object') return;
   let changed = false;
-  // Use server balance if it's higher (both sides accumulate)
-  if (typeof srv.balance === 'number' && srv.balance >= (data.balance || 0)) { data.balance = srv.balance; changed = true; }
-  // Use server hug counts if they exist and are >= local
-  if (typeof srv.myHugs === 'number' && srv.myHugs >= (data.myHugs || 0)) { data.myHugs = srv.myHugs; changed = true; }
-  if (typeof srv.taHugs === 'number' && srv.taHugs >= (data.taHugs || 0)) { data.taHugs = srv.taHugs; changed = true; }
-  // Server timeline is authoritative (merge, dedupe by id)
-  if (Array.isArray(srv.timeline)) {
-    const ids = new Set(data.timeline.map(e => e.id));
-    for (const e of srv.timeline) {
-      if (!ids.has(e.id)) { data.timeline.push(e); ids.add(e.id); }
-    }
-    changed = true;
-  }
-  if (srv.goal && srv.goal !== data.goal) { data.goal = srv.goal; changed = true; }
-  if (srv.goalAmount && srv.goalAmount !== data.goalAmount) { data.goalAmount = srv.goalAmount; changed = true; }
-  if (srv.partnerName) { data.partnerName = srv.partnerName; changed = true; }
-  if (srv.myName) { data.myName = srv.myName; changed = true; }
+  if (typeof srv.balance === 'number' && srv.balance !== data.balance) { data.balance = srv.balance; changed = true; }
+  if (typeof srv.myHugs === 'number' && srv.myHugs !== data.myHugs) { data.myHugs = srv.myHugs; changed = true; }
+  if (typeof srv.taHugs === 'number' && srv.taHugs !== data.taHugs) { data.taHugs = srv.taHugs; changed = true; }
+  if (srv.goal !== undefined && srv.goal !== data.goal) { data.goal = srv.goal; changed = true; }
+  if (srv.goalAmount !== undefined && srv.goalAmount !== data.goalAmount) { data.goalAmount = srv.goalAmount; changed = true; }
+  if (srv.partnerName && srv.partnerName !== data.partnerName) { data.partnerName = srv.partnerName; changed = true; }
+  if (srv.myName && srv.myName !== data.myName) { data.myName = srv.myName; changed = true; }
   if (changed) { saveLocal(); render(); }
 }
 
-async function pushToCloud() {
-  if (!cloudReady) return;
+async function pushToFirebase() {
+  if (!fbReady) return;
   try {
-    await db.collection('hugfund').doc('shared').set({
+    const updates = {};
+    updates['hugfund/state'] = {
       balance: data.balance,
       myHugs: data.myHugs,
       taHugs: data.taHugs,
-      timeline: data.timeline,
       goal: data.goal,
       goalAmount: data.goalAmount,
       partnerName: data.partnerName,
-      myName: data.myName,
-      _ts: Date.now()
-    });
-  } catch(e) {
-    // If set fails, try add (doc might not exist)
-    try {
-      await db.collection('hugfund').add({
-        _id: 'shared',
-        balance: data.balance,
-        myHugs: data.myHugs,
-        taHugs: data.taHugs,
-        timeline: data.timeline,
-        goal: data.goal,
-        goalAmount: data.goalAmount,
-        partnerName: data.partnerName,
-        myName: data.myName,
-        _ts: Date.now()
-      });
-    } catch(e2) {
-      // Silently fail — data is still in localStorage
+      myName: data.myName
+    };
+    // Push new timeline entries
+    for (const entry of data.timeline) {
+      updates['hugfund/timeline/' + entry.id] = entry;
     }
+    await db.ref().update(updates);
+  } catch(e) {
+    // Silently fail — data is in localStorage
   }
 }
 
@@ -515,7 +438,7 @@ function doHug(amount) {
   };
   data.timeline.push(entry);
   saveLocal();
-  pushToCloud();
+  pushToFirebase();
   render();
 }
 
@@ -752,7 +675,7 @@ document.addEventListener('click', (e) => {
   }
 });
 $('inputWhoAmI').addEventListener('change', function() {
-  data.whoAmI = this.value; saveLocal(); pushToCloud(); render();
+  data.whoAmI = this.value; saveLocal(); pushToFirebase(); render();
 });
 ['inputPartnerName','inputMyName','inputGoal','inputGoalAmount'].forEach(id => {
   $(id).addEventListener('change', () => {
@@ -760,13 +683,13 @@ $('inputWhoAmI').addEventListener('change', function() {
     data.myName = $('inputMyName').value.trim()||'老王';
     data.goal = $('inputGoal').value.trim();
     data.goalAmount = parseInt($('inputGoalAmount').value)||10000;
-    saveLocal(); pushToCloud(); render();
+    saveLocal(); pushToFirebase(); render();
   });
 });
 $('btnReset').addEventListener('click', () => {
   if (confirm('确定要清空所有数据吗？')) {
     data = { ...defaults, whoAmI: data.whoAmI };
-    saveLocal(); pushToCloud(); render();
+    saveLocal(); pushToFirebase(); render();
     $('settingsPanel').classList.remove('active');
   }
 });
@@ -778,33 +701,13 @@ $('btnReset').addEventListener('click', () => {
   }
   loadQRCode();
   
-  const cloudOk = await initCloudBase();
+  const cloudOk = await initFirebase();
   if (!cloudOk) {
-    // CloudBase failed — the sync label already shows why
+    // Firebase failed — the sync label already shows why
     // Don't try old server, don't overwrite the error message
   }
   render();
 })();
-
-function connectSSE(svr) {
-  const es = new EventSource(svr + '/api/sse');
-  es.onopen = () => setSyncState('online', '实时同步中');
-  es.addEventListener('state', (e) => {
-    try {
-      mergeServerData(JSON.parse(e.data));
-    } catch(ex) {}
-  });
-  es.addEventListener('hug', (e) => {
-    try {
-      const hug = JSON.parse(e.data);
-      if (hug.from !== data.whoAmI) {
-        showToast('🤗');
-        notifyMe(hug.message);
-      }
-    } catch(ex) {}
-  });
-  es.onerror = () => setSyncState('offline', '连接断开 · 数据已保存在本地');
-}
 </script>
 </body>
 </html>
