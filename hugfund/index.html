@@ -87,11 +87,12 @@ body {
 .modal .m-emoji { font-size:40px; margin-bottom:8px; }
 .modal .m-title { font-size:16px; font-weight:600; margin-bottom:8px; }
 .modal .m-desc { font-size:13px; color:var(--sub); line-height:1.6; margin-bottom:20px; }
-.modal .m-actions { display:flex; gap:12px; }
-.modal .m-actions button { flex:1; padding:12px; border-radius:50px; font-size:15px; font-weight:600; border:none; cursor:pointer; }
+.modal .m-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.modal .m-actions button { padding:12px 10px; border-radius:50px; font-size:14px; font-weight:600; border:none; cursor:pointer; }
 .modal .m-actions button:active { transform:scale(.96); }
-.btn-cancel { background:#f0e8e0; color:var(--sub); }
-.btn-confirm { background:var(--accent); color:#fff; }
+.btn-cancel { background:#f0e8e0; color:var(--sub); flex:1; }
+.btn-520 { background:var(--accent); color:#fff; flex:1.2; }
+.btn-1314 { background:linear-gradient(135deg,#e8856d,#c8963e); color:#fff; flex:1.2; }
 
 .hug-toast {
   position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(.5);
@@ -195,7 +196,7 @@ body {
   <button class="btn-hug" id="btnHug">
     <span class="emoji">🤗</span> 感觉 TA 不开心
   </button>
-  <div class="hug-hint">按一下 · 基金+1000 · TA收到抱抱</div>
+  <div class="hug-hint">按一下 · 选 ¥520 或 ¥1314 · TA收到抱抱</div>
 </div>
 
 <div class="sync-indicator">
@@ -214,10 +215,11 @@ body {
   <div class="modal">
     <div class="m-emoji">🤗</div>
     <div class="m-title">感觉 <span id="modalTaName">安妮</span> 不开心？</div>
-    <div class="m-desc">往心愿基金转入 <strong style="color:#c8963e">¥1,000</strong><br>同时给 TA 一个抱抱</div>
+    <div class="m-desc">往心愿基金存入一笔，同时给 TA 一个抱抱</div>
     <div class="m-actions">
       <button class="btn-cancel" id="btnCancel">再想想</button>
-      <button class="btn-confirm" id="btnConfirm">抱抱 🤗</button>
+      <button class="btn-confirm btn-520" data-amount="520">¥520 🤗</button>
+      <button class="btn-confirm btn-1314" data-amount="1314">¥1314 ❤️</button>
     </div>
   </div>
 </div>
@@ -449,7 +451,7 @@ function render() {
         <div class="tl-avatar">${item.emoji||'🤗'}</div>
         <div class="tl-body">
           <div class="tl-message">${esc(item.message||'')}</div>
-          <div class="tl-amount">+¥1,000 · 余额 ¥${(item.balanceAfter||0).toLocaleString()}</div>
+          <div class="tl-amount">+¥${(item.amount||520).toLocaleString()} · 余额 ¥${(item.balanceAfter||0).toLocaleString()}</div>
         </div>
         <div class="tl-time">${pad(t.getMonth()+1)}/${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}</div>`;
       $('timelineList').appendChild(li);
@@ -472,15 +474,17 @@ function setSyncState(cls, label) {
 }
 
 // ========== Hug ==========
-function doHug() {
+function doHug(amount) {
+  amount = amount || 520;
   const now = new Date().toISOString();
+  const emoji = amount === 1314 ? '❤️' : '🤗';
   const msg = data.whoAmI + ' 感觉 ' + data.partnerName + ' 不太开心，给了一个抱抱';
-  data.balance += 1000;
+  data.balance += amount;
   if (data.whoAmI === '老王') data.myHugs++; else data.taHugs++;
   const entry = {
     id: Math.random().toString(36).slice(2,10),
-    time: now, message: msg, from: data.whoAmI, emoji: '🤗',
-    amount: 1000, balanceAfter: data.balance
+    time: now, message: msg, from: data.whoAmI, emoji: emoji,
+    amount: amount, balanceAfter: data.balance
   };
   data.timeline.push(entry);
   saveLocal();
@@ -696,9 +700,13 @@ function saveShareCard() {
 $('btnHug').addEventListener('click', () => $('modalOverlay').classList.add('active'));
 $('btnCancel').addEventListener('click', () => $('modalOverlay').classList.remove('active'));
 $('modalOverlay').addEventListener('click', e => { if(e.target===$('modalOverlay')) $('modalOverlay').classList.remove('active'); });
-$('btnConfirm').addEventListener('click', () => {
-  $('modalOverlay').classList.remove('active');
-  setTimeout(() => { doHug(); showToast('🤗'); }, 200);
+// Two amount buttons
+document.querySelectorAll('[data-amount]').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const amount = parseInt(this.dataset.amount);
+    $('modalOverlay').classList.remove('active');
+    setTimeout(() => { doHug(amount); showToast(amount === 1314 ? '❤️' : '🤗'); }, 200);
+  });
 });
 
 // Share card
