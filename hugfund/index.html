@@ -297,19 +297,46 @@ async function initCloudBase() {
   try {
     cloudbase = window.cloudbase.init({ env: CB_ENV_ID });
     
-    // Try anonymous login
-    const auth = cloudbase.auth({ persistence: 'local' });
-    let loginRes;
+    // Try anonymous login — multiple API variants
+    let loginOk = false;
+    let lastErr = '';
+    
+    // Variant 1: auth({persistence}).anonymousAuthProvider().signIn()
     try {
-      loginRes = await auth.anonymousAuthProvider().signIn();
-    } catch(e1) {
-      // Fallback: try newer API
+      const auth = cloudbase.auth({ persistence: 'local' });
+      await auth.anonymousAuthProvider().signIn();
+      loginOk = true;
+    } catch(e1) { lastErr = 'v1:' + (e1.message||e1).slice(0,30); }
+    
+    // Variant 2: auth().signInAnonymously()
+    if (!loginOk) {
       try {
-        loginRes = await auth.signInAnonymously();
-      } catch(e2) {
-        setSyncState('offline', 'CloudBase 登录失败：请在控制台开启匿名登录');
-        return false;
-      }
+        const auth = cloudbase.auth();
+        await auth.signInAnonymously();
+        loginOk = true;
+      } catch(e2) { lastErr += ' v2:' + (e2.message||e2).slice(0,30); }
+    }
+    
+    // Variant 3: auth().anonymousAuthProvider().signIn() (no persistence)
+    if (!loginOk) {
+      try {
+        const auth = cloudbase.auth();
+        await auth.anonymousAuthProvider().signIn();
+        loginOk = true;
+      } catch(e3) { lastErr += ' v3:' + (e3.message||e3).slice(0,30); }
+    }
+    
+    // Variant 4: cloudbase.auth().signInWithTicket() or just init?
+    if (!loginOk) {
+      try {
+        await cloudbase.auth({ persistence: 'local' }).signInAnonymously();
+        loginOk = true;
+      } catch(e4) { lastErr += ' v4:' + (e4.message||e4).slice(0,30); }
+    }
+    
+    if (!loginOk) {
+      setSyncState('offline', '登录失败: ' + lastErr.slice(0, 60));
+      return false;
     }
     
     db = cloudbase.database();
