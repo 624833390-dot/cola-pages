@@ -745,19 +745,8 @@ $('btnReset').addEventListener('click', () => {
   
   const cloudOk = await initCloudBase();
   if (!cloudOk) {
-    // Try legacy server as fallback
-    const SVR = 'https://90d61849d58ffe.lhr.life';
-    try {
-      const res = await fetch(SVR + '/api/data', { signal: AbortSignal.timeout(3000) });
-      if (res.ok) {
-        const srv = await res.json();
-        mergeServerData(srv);
-        setSyncState('online', '本地服务器同步中 (SSE)');
-        connectSSE(SVR);
-      }
-    } catch(e) {
-      setSyncState('offline', '本机模式 · 设置 CloudBase 后实时同步');
-    }
+    // CloudBase failed — the sync label already shows why
+    // Don't try old server, don't overwrite the error message
   }
   render();
 })();
