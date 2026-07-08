@@ -265,7 +265,8 @@ const FB_CONFIG = {
   projectId: "hugfund-26222",
   storageBucket: "hugfund-26222.firebasestorage.app",
   messagingSenderId: "491595453257",
-  appId: "1:491595453257:web:ac3a30903ce2ce4041c098"
+  appId: "1:491595453257:web:ac3a30903ce2ce4041c098",
+  measurementId: "G-3CVPPP0685"
 };
 const PAGE_URL = 'https://624833390-dot.github.io/cola-pages/hugfund/';
 let firebase, db, fbReady = false;
@@ -292,13 +293,13 @@ function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); 
 
 // ========== Firebase init ==========
 async function initFirebase() {
-  if (!window.firebase) {
+  if (!window.firebase || !window.firebase.database) {
     setSyncState('offline', 'Firebase SDK 加载失败，检查网络');
     return false;
   }
   try {
-    firebase.initializeApp(FB_CONFIG);
-    db = firebase.database();
+    const app = firebase.initializeApp(FB_CONFIG);
+    db = firebase.database(app);
     fbReady = true;
 
     // Real-time sync: listen for all changes
@@ -328,7 +329,7 @@ async function initFirebase() {
     setSyncState('cloud', 'Firebase 实时同步中');
     return true;
   } catch(e) {
-    setSyncState('offline', 'Firebase 连接失败：' + (e.message||e).toString().slice(0,40));
+    setSyncState('offline', 'Firebase 失败：' + (e.message||String(e)).slice(0, 50));
     return false;
   }
 }
